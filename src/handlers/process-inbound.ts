@@ -34,6 +34,7 @@ import {
     sendPrivateForwardMsg,
     setMsgEmojiLike,
     getMsg,
+    getGroupMemberInfo,
 } from "../connection.js";
 import { setActiveReplyTarget, clearActiveReplyTarget, setActiveReplySessionId, setForwardSuppressDelivery, setActiveReplySelfId } from "../reply-context.js";
 import { loadPluginSdk, getSdk } from "../sdk.js";
@@ -227,10 +228,14 @@ export async function processInboundMessage(api: any, msg: OneBotMessage): Promi
 
     const envelopeOptions = runtime.channel.reply?.resolveEnvelopeFormatOptions?.(cfg) ?? {};
     const chatType = isGroup ? "group" : "direct";
-    // 优先使用群名片(card)，其次是昵称(nickname)，都没有则为空串
-    const senderNickname = (isGroup ? msg.sender?.card?.trim() : undefined)
+    // 优先使用群名片(card)，其次是昵称(nickname)，都没有则调用 get_group_member_info API 补全
+    let senderNickname = (isGroup ? msg.sender?.card?.trim() : undefined)
         || msg.sender?.nickname?.trim()
         || "";
+    if (!senderNickname && isGroup && groupId) {
+        const memberInfo = await getGroupMemberInfo(groupId, userId);
+        senderNickname = memberInfo?.card?.trim() || memberInfo?.nickname?.trim() || "";
+    }
     const fromLabel = senderNickname || String(userId);
 
     // 添加日志：打印插件接收到的原始消息内容
